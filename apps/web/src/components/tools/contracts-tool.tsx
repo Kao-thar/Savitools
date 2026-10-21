@@ -1,7 +1,16 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
-import { Upload, FileCode, Terminal, ExternalLink, Clock, Trash2, BookOpen, Link as LinkIcon } from 'lucide-react';
+import {
+  Upload,
+  FileCode,
+  Terminal,
+  ExternalLink,
+  Clock,
+  Trash2,
+  BookOpen,
+  Link as LinkIcon,
+} from 'lucide-react';
 import { compareAbis, type AbiChange } from '@/lib/abi-diff';
 import {
   attachContractAbi,
@@ -28,7 +37,13 @@ function loadHistory(): DeployedContract[] {
 
 function saveHistory(contracts: DeployedContract[]) {
   if (typeof window === 'undefined') return;
-  window.localStorage.setItem('savitools:contracts:history', JSON.stringify(contracts));
+  try {
+    // Keep most recent 50 contracts to preserve browser storage quota
+    const bounded = contracts.slice(0, 50);
+    window.localStorage.setItem('savitools:contracts:history', JSON.stringify(bounded));
+  } catch {
+    // Gracefully ignore storage quota or restriction errors
+  }
 }
 
 function AbiCatalogPanel({ contractId }: { contractId: string }) {
@@ -68,8 +83,7 @@ function AbiCatalogPanel({ contractId }: { contractId: string }) {
       setCatalog(entry);
       setAbiJson('');
     } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : 'ABI validation failed.';
+      const message = err instanceof Error ? err.message : 'ABI validation failed.';
       setAbiError(message);
     } finally {
       setLoading(false);
@@ -98,9 +112,9 @@ function AbiCatalogPanel({ contractId }: { contractId: string }) {
       </h2>
 
       <p className="text-xs text-muted-foreground">
-        Attach a validated interface JSON to browse callable methods and emitted
-        events before invoking. SaviTools never converts amounts through binary
-        floating point — integers stay decimal strings.
+        Attach a validated interface JSON to browse callable methods and emitted events before
+        invoking. SaviTools never converts amounts through binary floating point — integers stay
+        decimal strings.
       </p>
 
       <div className="flex gap-2">
@@ -149,7 +163,8 @@ function AbiCatalogPanel({ contractId }: { contractId: string }) {
                     selectedMethod === m.name ? 'border-primary bg-primary/5' : 'border-border'
                   }`}
                 >
-                  {m.name}({m.arguments.map((a) => `${a.name}: ${a.type}`).join(', ')}) → {m.returnType}
+                  {m.name}({m.arguments.map((a) => `${a.name}: ${a.type}`).join(', ')}) →{' '}
+                  {m.returnType}
                 </button>
               ))}
             </div>
@@ -158,20 +173,24 @@ function AbiCatalogPanel({ contractId }: { contractId: string }) {
           {selectedMethod && (
             <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground">Arguments</p>
-              {(catalog.methods.find((m) => m.name === selectedMethod)?.arguments ?? []).map((a) => (
-                <div key={a.name} className="flex items-center gap-2">
-                  <span className="w-24 shrink-0 text-xs font-mono text-muted-foreground">{a.name}</span>
-                  <input
-                    value={argValues[a.name] ?? ''}
-                    onChange={(e) =>
-                      setArgValues((prev) => ({ ...prev, [a.name]: e.target.value }))
-                    }
-                    placeholder={`Enter ${a.type} as a plain string`}
-                    className="flex-1 rounded border border-input bg-background px-2 py-1.5 text-xs font-mono"
-                    spellCheck={false}
-                  />
-                </div>
-              ))}
+              {(catalog.methods.find((m) => m.name === selectedMethod)?.arguments ?? []).map(
+                (a) => (
+                  <div key={a.name} className="flex items-center gap-2">
+                    <span className="w-24 shrink-0 text-xs font-mono text-muted-foreground">
+                      {a.name}
+                    </span>
+                    <input
+                      value={argValues[a.name] ?? ''}
+                      onChange={(e) =>
+                        setArgValues((prev) => ({ ...prev, [a.name]: e.target.value }))
+                      }
+                      placeholder={`Enter ${a.type} as a plain string`}
+                      className="flex-1 rounded border border-input bg-background px-2 py-1.5 text-xs font-mono"
+                      spellCheck={false}
+                    />
+                  </div>
+                ),
+              )}
               <button
                 type="button"
                 onClick={() => void encodeArgs()}
@@ -191,7 +210,10 @@ function AbiCatalogPanel({ contractId }: { contractId: string }) {
             <p className="text-xs font-medium text-muted-foreground mb-1.5">Events</p>
             <div className="space-y-1">
               {catalog.events.map((e) => (
-                <div key={e.name} className="rounded border border-border px-3 py-2 text-xs font-mono">
+                <div
+                  key={e.name}
+                  className="rounded border border-border px-3 py-2 text-xs font-mono"
+                >
                   <span className="inline-flex items-center gap-2">
                     {e.name}
                     <LinkIcon className="h-3 w-3 text-muted-foreground" />
@@ -214,7 +236,8 @@ function AbiCatalogPanel({ contractId }: { contractId: string }) {
                   </span>
                   {e.topics.length > 0 && (
                     <div className="text-muted-foreground mt-1">
-                      topics: {e.topics.map((t) => `${t.name}${t.indexed ? ' (indexed)' : ''}`).join(', ')}
+                      topics:{' '}
+                      {e.topics.map((t) => `${t.name}${t.indexed ? ' (indexed)' : ''}`).join(', ')}
                     </div>
                   )}
                 </div>
@@ -248,7 +271,8 @@ function AbiDiffPanel() {
       <div>
         <h2 className="text-sm font-medium">Compare contract ABIs</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          Compare two Soroban interface JSON documents. Removed or changed signatures are breaking; new entries are additive.
+          Compare two Soroban interface JSON documents. Removed or changed signatures are breaking;
+          new entries are additive.
         </p>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -283,24 +307,30 @@ function AbiDiffPanel() {
       >
         Compare ABIs
       </button>
-      {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
+      {error && (
+        <p role="alert" className="text-xs text-destructive">
+          {error}
+        </p>
+      )}
       {changes && (
         <div aria-live="polite" className="space-y-2">
           {changes.length === 0 ? (
             <p className="text-xs text-muted-foreground">No ABI changes detected.</p>
-          ) : changes.map((change, index) => (
-            <div
-              key={`${change.kind}-${change.name}-${index}`}
-              className={`flex items-start gap-2 rounded border px-3 py-2 text-xs ${
-                change.classification === 'breaking'
-                  ? 'border-destructive/30 bg-destructive/5 text-destructive'
-                  : 'border-green-500/30 bg-green-500/5 text-green-700 dark:text-green-400'
-              }`}
-            >
-              <span className="font-semibold uppercase">{change.classification}</span>
-              <span className="font-mono">{change.detail}</span>
-            </div>
-          ))}
+          ) : (
+            changes.map((change, index) => (
+              <div
+                key={`${change.kind}-${change.name}-${index}`}
+                className={`flex items-start gap-2 rounded border px-3 py-2 text-xs ${
+                  change.classification === 'breaking'
+                    ? 'border-destructive/30 bg-destructive/5 text-destructive'
+                    : 'border-green-500/30 bg-green-500/5 text-green-700 dark:text-green-400'
+                }`}
+              >
+                <span className="font-semibold uppercase">{change.classification}</span>
+                <span className="font-mono">{change.detail}</span>
+              </div>
+            ))
+          )}
         </div>
       )}
     </section>
@@ -513,7 +543,12 @@ export function ContractsTool() {
             onChange={(e) => {
               setConstructorArgs(e.target.value);
               if (e.target.value) {
-                try { JSON.parse(e.target.value); setArgsError(''); } catch { setArgsError('Invalid JSON'); }
+                try {
+                  JSON.parse(e.target.value);
+                  setArgsError('');
+                } catch {
+                  setArgsError('Invalid JSON');
+                }
               } else {
                 setArgsError('');
               }
@@ -569,9 +604,7 @@ export function ContractsTool() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="text-xs text-muted-foreground mb-1.5 block">
-                  Function name
-                </label>
+                <label className="text-xs text-muted-foreground mb-1.5 block">Function name</label>
                 <input
                   value={functionName}
                   onChange={(e) => setFunctionName(e.target.value)}
@@ -611,7 +644,9 @@ export function ContractsTool() {
             {invokeResult && (
               <div className="rounded-md bg-muted/30 border border-border px-4 py-3">
                 <p className="text-xs text-muted-foreground mb-2">Response</p>
-                <pre className="text-xs font-mono whitespace-pre-wrap break-all">{invokeResult}</pre>
+                <pre className="text-xs font-mono whitespace-pre-wrap break-all">
+                  {invokeResult}
+                </pre>
               </div>
             )}
 
