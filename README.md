@@ -379,6 +379,7 @@ Complete guides and API reference for integrating with SaviTools:
 | **[Playground Host Smoke Check](docs/playground-host-smoke.md)**           | Read-only release check for the public production/testnet API bases         |
 | **[OpenAPI Contract Gate](docs/openapi-contract.md)**                      | CI check that keeps the generated OpenAPI document aligned with API routes  |
 | **[Browser & Wallet Compatibility](docs/browser-wallet-compatibility.md)** | Supported browsers, Freighter assumptions, and degraded behavior            |
+| **[Browser Storage & Retention](docs/browser-storage-and-retention.md)**   | Key taxonomy, quota limits, eviction policies, and degradation behavior     |
 | **[Swagger UI](/api/docs)**                                                | Interactive API explorer (available in dev/staging; disabled in production) |
 
 ### Quick Links

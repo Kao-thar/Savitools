@@ -10,8 +10,6 @@ build/
 out/
 
 # Environment
-.env
-.env.local
 .env.development.local
 .env.test.local
 .env.production.local
@@ -33,7 +31,6 @@ yarn-error.log*
 Thumbs.db
 
 # IDE
-.vscode/
 .idea/
 *.suo
 *.ntvs*
@@ -47,3 +44,4 @@ Thumbs.db
 apps/web/tsconfig.tsbuildinfo
 # Local task tracking
 tasks/
+config.bat

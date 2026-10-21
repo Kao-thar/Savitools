@@ -31,15 +31,15 @@ are outside the support window.
 
 ### Browser APIs the console relies on
 
-| Capability                  | Used for                                                       | Requirement                                        |
-| --------------------------- | -------------------------------------------------------------- | -------------------------------------------------- |
-| `fetch`, `EventSource`      | API calls and Ledger Monitor streams                           | Supported in all listed browsers                   |
-| WebSocket (Socket.IO)       | Live Ledger Monitor feed; Socket.IO falls back to HTTP polling | Supported in all listed browsers                   |
-| `localStorage`              | Preferences, recents, onboarding, theme, guest workspaces      | May be unavailable in private/restricted modes     |
-| Clipboard API               | Copy buttons across the tools                                  | Secure context; user permission may be required    |
-| WebCrypto (`crypto.subtle`) | Webhook signature preview, passkey flows                       | Secure context (HTTPS or localhost)                |
-| WebAuthn / passkeys         | Passkey registration and login                                 | Secure context plus platform/roaming authenticator |
-| `getUserMedia`              | QR Handoff camera scanning                                     | Secure context plus camera permission              |
+| Capability                  | Used for                                                       | Requirement                                                               |
+| --------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `fetch`, `EventSource`      | API calls and Ledger Monitor streams                           | Supported in all listed browsers                                          |
+| WebSocket (Socket.IO)       | Live Ledger Monitor feed; Socket.IO falls back to HTTP polling | Supported in all listed browsers                                          |
+| `localStorage`              | Preferences, recents, onboarding, theme, guest workspaces      | See [Browser Storage Policy](browser-storage-and-retention.md) for limits |
+| Clipboard API               | Copy buttons across the tools                                  | Secure context; user permission may be required                           |
+| WebCrypto (`crypto.subtle`) | Webhook signature preview, passkey flows                       | Secure context (HTTPS or localhost)                                       |
+| WebAuthn / passkeys         | Passkey registration and login                                 | Secure context plus platform/roaming authenticator                        |
+| `getUserMedia`              | QR Handoff camera scanning                                     | Secure context plus camera permission                                     |
 
 ## Wallet assumptions
 
