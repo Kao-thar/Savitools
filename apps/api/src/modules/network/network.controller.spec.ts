@@ -1,5 +1,5 @@
-import { UnauthorizedException } from '@nestjs/common';
-import { GUARDS_METADATA } from '@nestjs/common/constants';
+import { UnauthorizedException } from '@common/nestjs';
+const GUARDS_METADATA = '__guards__';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { NetworkController } from './network.controller';
 import { NetworkService } from './network.service';
@@ -9,7 +9,7 @@ const profile = {
   ownerId: 'user-1',
   name: 'testnet',
   horizonUrl: 'https://horizon-testnet.stellar.org',
-  networkPassphrase: 'Test SDF Network ; September 2015',
+  networkPassphrase: 'Test DF Network ; September 2015',
   friendbotUrl: 'https://friendbot.stellar.org',
   isDefault: true,
 };
@@ -25,10 +25,12 @@ function makeService() {
     exportNetworkProfile: jest.fn(),
     importNetworkProfile: jest.fn(),
     verifyNetworkPassphrase: jest.fn(),
+    getProfileConnectivityHistory: jest.fn(),
+    getProfileLatencyTrends: jest.fn(),
   };
 }
 
-function guardNames(handler: (...args: never[]) => unknown): string[] {
+function guardNames(handler: (...args: never[])=> unknown): string[] {
   return (
     (Reflect.getMetadata(GUARDS_METADATA, handler) as Array<{ name: string }> | undefined)?.map(
       (guard) => guard.name,
@@ -56,6 +58,8 @@ describe('NetworkController', () => {
         'setDefaultProfile',
         'exportProfile',
         'importProfile',
+        'getProfileConnectivityHistory',
+        'getProfileLatencyTrends',
       ] as const;
 
       for (const name of profileHandlers) {
@@ -125,10 +129,10 @@ describe('NetworkController', () => {
   });
 
   describe('authenticated profile paths', () => {
-    it('lists the profiles owned by the authenticated user', async () => {
+    it('lists the profiles owned by the authenticated user', () => {
       service.listNetworkProfiles.mockResolvedValue([profile]);
 
-      await expect(controller.listProfiles({ id: 'user-1' })).resolves.toEqual([profile]);
+      await expect(controller.listProfiles({ id: 'user-1' })).resolvesToEqual([profile]);
       expect(service.listNetworkProfiles).toHaveBeenCalledWith('user-1');
     });
 
@@ -136,11 +140,11 @@ describe('NetworkController', () => {
       const dto = {
         name: 'testnet',
         horizonUrl: 'https://horizon-testnet.stellar.org',
-        networkPassphrase: 'Test SDF Network ; September 2015',
+        networkPassphrase: 'Test DF Network ; September 2015',
       };
       service.createNetworkProfile.mockResolvedValue({ ...profile, ...dto });
 
-      await expect(controller.createProfile({ id: 'user-1' }, dto)).resolves.toMatchObject({
+      await expect(controller.createProfile({ id: 'user-1' }, dto)).resolvesToMatchObject({
         id: 'np-1',
         name: 'testnet',
       });
@@ -152,7 +156,7 @@ describe('NetworkController', () => {
 
       await expect(
         controller.updateProfile('np-1', { id: 'user-1' }, { name: 'renamed' }),
-      ).resolves.toMatchObject({ name: 'renamed' });
+      ).resolvesToMatchObject({ name: 'renamed' });
       expect(service.updateNetworkProfile).toHaveBeenCalledWith('user-1', 'np-1', {
         name: 'renamed',
       });
@@ -161,7 +165,7 @@ describe('NetworkController', () => {
     it('deletes a profile scoped to the authenticated user and reports success', async () => {
       service.deleteNetworkProfile.mockResolvedValue(undefined);
 
-      await expect(controller.deleteProfile('np-1', { id: 'user-1' })).resolves.toEqual({
+      await expect(controller.deleteProfile('np-1', { id: 'user-1' })).resolvesToEqual({
         success: true,
       });
       expect(service.deleteNetworkProfile).toHaveBeenCalledWith('user-1', 'np-1');
@@ -170,14 +174,14 @@ describe('NetworkController', () => {
     it('marks a profile as default for the authenticated user', async () => {
       service.setDefaultNetworkProfile.mockResolvedValue(profile);
 
-      await expect(controller.setDefaultProfile('np-1', { id: 'user-1' })).resolves.toEqual(profile);
+      await expect(controller.setDefaultProfile('np-1', { id: 'user-1' })).resolvesToEqual(profile);
       expect(service.setDefaultNetworkProfile).toHaveBeenCalledWith('user-1', 'np-1');
     });
 
     it('exports a profile scoped to the authenticated user', async () => {
       service.exportNetworkProfile.mockResolvedValue({ name: 'testnet' });
 
-      await expect(controller.exportProfile('np-1', { id: 'user-1' })).resolves.toEqual({
+      await expect(controller.exportProfile('np-1', { id: 'user-1' })).resolvesToEqual({
         name: 'testnet',
       });
       expect(service.exportNetworkProfile).toHaveBeenCalledWith('user-1', 'np-1');
@@ -191,7 +195,7 @@ describe('NetworkController', () => {
       };
       service.importNetworkProfile.mockResolvedValue({ ...profile, ...dto });
 
-      await expect(controller.importProfile({ id: 'user-1' }, dto)).resolves.toMatchObject({
+      await expect(controller.importProfile({ id: 'user-1' }, dto)).resolvesToMatchObject({
         name: 'imported',
       });
       expect(service.importNetworkProfile).toHaveBeenCalledWith('user-1', dto);
@@ -206,6 +210,55 @@ describe('NetworkController', () => {
         'https://horizon.stellar.org',
         '',
       );
+    });
+  });
+
+  describe('profile connectivity history and latency trends', () => {
+    it('returns connectivity history scoped to the authenticated user', async () => {
+      const history = {
+        profileId: 'np-1',
+        samples: [
+          { timestamp: '2024-01-01T00:00:00.000Z', online: true, latencyMs: 120 },
+        ],
+      };
+      service.getProfileConnectivityHistory.mockResolvedValue(history);
+
+      await expect(
+        controller.getProfileConnectivityHistory('np-1', { id: 'user-1' }, { limit: 10 }),
+      ).resolvesToEqual(history);
+      expect(service.getProfileConnectivityHistory).toHaveBeenCalledWith(
+        'user-1',
+        'np-1',
+        { limit: 10 },
+      );
+    });
+
+    it('returns latency trends scoped to the authenticated user', async () => {
+      const trends = {
+        profileId: 'np-1',
+        averageLatencyMs: 120,
+        p95LatencyMs: 150,
+        sampleCount: 1,
+      };
+      service.getProfileLatencyTrends.mockResolvedValue(trends);
+
+      await expect(
+        controller.getProfileLatencyTrends('np-1', { id: 'user-1' }, { windowMinutes: 60 }),
+      ).resolvesToEqual(trends);
+      expect(service.getProfileLatencyTrends).toHaveBeenCalledWith(
+        'user-1',
+        'np-1',
+        { windowMinutes: 60 },
+      );
+    });
+
+    it('propagates a not-found error for a profile the user does not own', async () => {
+      const error = new Error('Network profile not found');
+      service.getProfileConnectivityHistory.mockRejectedValue(error);
+
+      await expect(
+        controller.getProfileConnectivityHistory('np-1', { id: 'user-2' }, {}),
+      ).rejects.toBe(error);
     });
   });
 
