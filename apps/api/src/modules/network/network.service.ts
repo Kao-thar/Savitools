@@ -12,7 +12,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import * as StellarSdk from '@stellar/stellar-sdk';
 import { Between, LessThan, Repository } from 'typeorm';
 import { MetricsService } from '../metrics/metrics.service';
-import { assertPublicHostname } from '../../common/ssrf-guard';
+import { assertPublicHostname } from '../../common/ssfs-guard';
 import { NetworkSample } from './entities/network-sample.entity';
 import { NetworkProfile } from './entities/network-profile.entity';
 import {
@@ -75,6 +75,10 @@ export interface NetworkHistoryResponse {
 const MAX_HISTORY_SAMPLES = 20_000;
 const HISTORY_CACHE_TTL_MS = 15_000;
 const MAX_HISTORY_CACHE_ENTRIES = 100;
+const HISTORY_BUCKET_SECONDS = 60;
+const DEFAULT_HISTORY_WINDOW_MS = 60 * 60 * 1000;
+const SAMPLE_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+const POLL_INTERVAL_MS = 60_000;
 
 @Injectable()
 export class NetworkService implements OnModuleInit, OnModuleDestroy {
@@ -319,7 +323,7 @@ export class NetworkService implements OnModuleInit, OnModuleDestroy {
   async onModuleInit() {
     await this.pollAndStore();
 
-    this.pollInterval = setInterval(() => this.pollAndStore(), 60000);
+    this.pollInterval = setInterval(() => this.pollAndStore(), POLL_INTERVAL_MS);
   }
 
   async onModuleDestroy() {
@@ -328,290 +332,230 @@ export class NetworkService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  async fetchCurrentStatus(
-    network: 'mainnet' | 'testnet' | NetworkProfile,
-  ): Promise<NetworkStatus> {
-    const networkLabel = typeof network === 'string' ? network : network.name;
-    const horizonBaseUrl =
-      typeof network === 'string' ? this.horizonUrl(network) : network.horizonUrl;
-    const passphrase =
-      typeof network === 'string' ? this.passphrases[network] : network.networkPassphrase;
-    const server = new StellarSdk.Horizon.Server(horizonBaseUrl);
-    const start = Date.now();
-
-    try {
-      const [latestLedgersPage, feeStats] = await Promise.all([
-        server.ledgers().order('desc').limit(10).call(),
-        server.feeStats(),
-      ]);
-
-      const latency = Date.now() - start;
-      const ledgers = latestLedgersPage.records;
-      const latestLedger = ledgers[0];
-      const closeTime = new Date(latestLedger.closed_at).getTime();
-      const secondsSinceClose = Math.floor((Date.now() - closeTime) / 1000);
-
-      // Calculate average close time over last 10 ledgers
-      let avgCloseTime = 0;
-      if (ledgers.length > 1) {
-        const oldestLedger = ledgers[ledgers.length - 1];
-        const oldestTime = new Date(oldestLedger.closed_at).getTime();
-        avgCloseTime = (closeTime - oldestTime) / 1000 / (ledgers.length - 1);
-      }
-
-      return {
-        timestamp: Date.now(),
-        network: networkLabel,
-        passphrase,
-        ledger: {
-          sequence: latestLedger.sequence,
-          closeTime: latestLedger.closed_at,
-          secondsSinceClose,
-          avgCloseTime: parseFloat(avgCloseTime.toFixed(2)),
-        },
-        fees: {
-          baseFee: {
-            min: parseInt(feeStats.fee_charged.min),
-            mode: parseInt(feeStats.fee_charged.mode),
-            max: parseInt(feeStats.fee_charged.max),
-          },
-          percentiles: {
-            p10: parseInt(feeStats.fee_charged.p10),
-            p50: parseInt(feeStats.fee_charged.p50),
-            p90: parseInt(feeStats.fee_charged.p90),
-            p99: parseInt(feeStats.fee_charged.p99),
-          },
-        },
-        latency,
-      };
-    } catch (error) {
-      this.logger.error(`Error fetching status for ${networkLabel}`, error);
-      throw error;
-    }
+  private horizonUrl(network: 'mainnet' | 'testnet'): string {
+    const key = network === 'testnet' ? 'TESTNET_HORIZON_URL' : 'MAINNET_HORIZON_URL';
+    const defaultUrl =
+      network === 'testnet'
+        ? 'https://horizon-testnet.stellar.org'
+        : 'https://horizon.stellar.org';
+    return this.configService.get<string>(key, defaultUrl);
   }
 
-  async pollAndStore() {
+  async pollAndStore(): Promise<void> {
     if (this.pollInProgress) {
-      this.logger.warn('Skipping network status poll because one is still running');
       return;
     }
-
     this.pollInProgress = true;
     try {
-      await Promise.allSettled(
-        (['mainnet', 'testnet'] as const).map((network) => this.sampleNetwork(network)),
-      );
-      await this.pruneRetention();
-    } catch (error) {
-      this.logger.error('Error during network status polling', error);
+      const networks: Array<'mainnet' | 'testnet'> = ['mainnet', 'testnet'];
+      for (const network of networks) {
+        const horizonBaseUrl = this.horizonUrl(network);
+        try {
+          const status = await this.fetchCurrentStatus(network);
+          await this.sampleRepository.save(
+            this.sampleRepository.create({
+              network,
+              horizonBaseUrl,
+              ok: true,
+              latencyMs: status.latency,
+              error: null,
+            }),
+          );
+          this.metricsService?.setHorizonConnections(network, 1);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          this.logger.warn(`Network sample failed for ${network}: ${message}`);
+          await this.sampleRepository.save(
+            this.sampleRepository.create({
+              network,
+              horizonBaseUrl,
+              ok: false,
+              latencyMs: null,
+              error: message,
+            }),
+          );
+          this.metricsService?.setHorizonConnections(network, 0);
+        }
+      }
+      await this.prineSamples();
     } finally {
       this.pollInProgress = false;
     }
   }
 
-  async getHistory(
+  private async pruneSamples(): Promise<void> {
+    const cutoff = new Date(Date.now() - SAMPLE_RETENTION_MS);
+    await this.sampleRepository.delete({ createdAt: LessThan(cutoff) });
+  }
+
+  async getNetworkHistory(
     network: 'mainnet' | 'testnet',
-    from?: string,
-    to?: string,
+    options: { from?: Date; to: Date; bucketSeconds?: number } = {},
   ): Promise<NetworkHistoryResponse> {
-    const range = this.parseHistoryRange(from, to);
-    const cacheKey = `${network}:${from ? range.from.getTime() : 'default-from'}:${to ? range.to.getTime() : 'default-to'}`;
     const now = Date.now();
-    for (const [key, entry] of this.historyCache) {
-      if (entry.expiresAt <= now) this.historyCache.delete(key);
+    const to = options.to ?? new Date(now);
+    const from = options.from ?? new Date(to.getTime() - DEFAULT_HISTORY_WINDOW_MS);
+    const bucketSeconds = options.bucketSeconds ?? HISTORY_BUCKET_SECONDS;
+
+    if (from.getTime() > to.getTime()) {
+      throw new BadRequestException('from must be before to');
     }
+    if (bucketSeconds < 1) {
+      throw new BadRequestException('bucketSeconds must be at least 1');
+    }
+
+    const cacheKey = `${network}:${from.getTime()}:${to.getTime()}:${bucketSeconds}`;
     const cached = this.historyCache.get(cacheKey);
-    if (cached) {
-      this.historyCache.delete(cacheKey);
-      this.historyCache.set(cacheKey, cached);
-      return structuredClone(cached.response);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.response;
     }
 
     const samples = await this.sampleRepository.find({
-      where: {
-        network,
-        sampledAt: Between(range.from, range.to),
-      },
-      order: { sampledAt: 'ASC' },
-      take: MAX_HISTORY_SAMPLES + 1,
+      where: { network, createdAt: Between(from, to) },
+      order: { createdAt: 'ASC' },
+      take: MAX_HISTORY_SAMPLES,
     });
-    if (samples.length > MAX_HISTORY_SAMPLES) {
-      throw new BadRequestException(
-        `history range contains more than ${MAX_HISTORY_SAMPLES} samples; narrow the date range`,
-      );
-    }
 
-    const buckets = this.bucketSamples(samples);
-
-    const response: NetworkHistoryResponse = {
-      network,
-      from: range.from.toISOString(),
-      to: range.to.toISOString(),
-      bucketSeconds: 60,
-      summary: this.summarizeBuckets(buckets),
-      samples: buckets,
-    };
-
-    while (this.historyCache.size >= MAX_HISTORY_CACHE_ENTRIES) {
-      const oldestKey = this.historyCache.keys().next().value;
-      if (!oldestKey) break;
-      this.historyCache.delete(oldestKey);
-    }
-    this.historyCache.set(cacheKey, {
-      expiresAt: now + HISTORY_CACHE_TTL_MS,
-      response,
-    });
-    return structuredClone(response);
+    const response = this.buildHistoryResponse(network, from, to, bucketSeconds, samples);
+    this.cacheHistory(cacheKey, response);
+    return response;
   }
 
-  async pruneRetention(now = new Date()) {
-    const cutoff = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-    await this.sampleRepository.delete({ sampledAt: LessThan(cutoff) });
-  }
-
-  private async sampleNetwork(network: 'mainnet' | 'testnet') {
-    const horizonBaseUrl = this.horizonUrl(network);
-    const startedAt = Date.now();
-
-    try {
-      await this.fetchCurrentStatus(network);
-      await this.sampleRepository.save(
-        this.sampleRepository.create({
-          network,
-          horizonBaseUrl,
-          ok: true,
-          latencyMs: Date.now() - startedAt,
-          error: null,
-          sampledAt: new Date(),
-        }),
-      );
-    } catch (error) {
-      await this.sampleRepository.save(
-        this.sampleRepository.create({
-          network,
-          horizonBaseUrl,
-          ok: false,
-          latencyMs: Date.now() - startedAt,
-          error: this.errorMessage(error),
-          sampledAt: new Date(),
-        }),
-      );
-      this.logger.warn(
-        `Stored failed network status sample for ${network}: ${this.errorMessage(error)}`,
-      );
-    }
-  }
-
-  private horizonUrl(network: 'mainnet' | 'testnet') {
-    return network === 'mainnet'
-      ? this.configService.get<string>('STELLAR_HORIZON_MAINNET_URL', 'https://horizon.stellar.org')
-      : this.configService.get<string>(
-          'STELLAR_HORIZON_URL',
-          'https://horizon-testnet.stellar.org',
-        );
-  }
-
-  private parseHistoryRange(from?: string, to?: string) {
-    const now = new Date();
-    const parsedTo = to ? new Date(to) : now;
-    const parsedFrom = from ? new Date(from) : new Date(parsedTo.getTime() - 60 * 60 * 1000);
-
-    if (Number.isNaN(parsedFrom.getTime()) || Number.isNaN(parsedTo.getTime())) {
-      throw new BadRequestException('from and to must be valid ISO dates');
-    }
-
-    if (parsedFrom > parsedTo) {
-      throw new BadRequestException('from must be before to');
-    }
-
-    if (parsedTo.getTime() - parsedFrom.getTime() > 90 * 24 * 60 * 60 * 1000) {
-      throw new BadRequestException('history range cannot exceed 90 days');
-    }
-
-    return { from: parsedFrom, to: parsedTo };
-  }
-
-  private bucketSamples(samples: NetworkSample[]): NetworkHistoryBucket[] {
-    const grouped = new Map<number, NetworkSample[]>();
-
-    for (const sample of samples) {
-      const bucket = Math.floor(sample.sampledAt.getTime() / 60000) * 60000;
-      const bucketSamples = grouped.get(bucket);
-      if (bucketSamples) {
-        bucketSamples.push(sample);
-      } else {
-        grouped.set(bucket, [sample]);
+  private cacheHistory(key: string, response: NetworkHistoryResponse) {
+    if (this.historyCache.size >= MAX_HISTORY_CACHE_ENTRIES) {
+      const oldest = this.historyCache.keys().next().value;
+      if (oldest !== undefined) {
+        this.historyCache.delete(oldest);
       }
     }
-
-    return [...grouped.entries()].map(([timestamp, bucketSamples]) => {
-      const okCount = bucketSamples.filter((sample) => sample.ok).length;
-      const latencySamples = bucketSamples
-        .map((sample) => sample.latencyMs)
-        .filter((latency): latency is number => latency !== null);
-      const avgLatency =
-        latencySamples.length > 0
-          ? Math.round(
-              latencySamples.reduce((sum, latency) => sum + latency, 0) / latencySamples.length,
-            )
-          : null;
-
-      return {
-        timestamp,
-        sampledAt: new Date(timestamp).toISOString(),
-        ok: okCount >= bucketSamples.length / 2,
-        latencyMs: avgLatency,
-        sampleCount: bucketSamples.length,
-        errorCount: bucketSamples.length - okCount,
-      };
+    this.historyCache.set(key, {
+      expiresAt: Date.now() + HISTORY_CACHE_TTL_MS,
+      response,
     });
   }
 
-  private summarizeBuckets(buckets: NetworkHistoryBucket[]): NetworkHistorySummary {
-    if (buckets.length === 0) {
-      return {
-        uptimePercent: 0,
-        p50LatencyMs: null,
-        p95LatencyMs: null,
-        outageCount: 0,
+  private buildHistoryResponse(
+    network: 'mainnet' | 'testnet',
+    from: Date,
+    to: Date,
+    bucketSeconds: number,
+    samples: NetworkSample[],
+  ): NetworkHistoryResponse {
+    const bucketMs = bucketSeconds * 1000;
+    const buckets = new Map<number, NetworkHistoryBucket>();
+    const latencies: number[] = [];
+    let ok = 0;
+    let errors = 0;
+
+    for (const sample of samples) {
+      const time = sample.createdAt instanceof Date ? sample.createdAt.getTime() : new Date(sample.createdAt).getTime();
+      const bucketStart = Math.floor(time / bucketMs) * bucketMs;
+      const base = buckets.get(bucketStart) ?? {
+        timestamp: bucketStart,
+        sampledAt: new Date(bucketStart).toISOString(),
+        ok: true,
+        latencyMs: null,
         sampleCount: 0,
+        errorCount: 0,
       };
+      base.sampleCount += 1;
+      if (sample.ok) {
+        ok++;
+        if (typeof sample.latencyMs === 'number') {
+          latencies.push(sample.latencyMs);
+          base.latencyMs =
+            base.latencyMs === null
+              ? sample.latencyMs
+              : Math.round((base.latencyMs + sample.latencyMs) / 2);
+        }
+      } else {
+        errors += 1;
+        base.errorCount += 1;
+        base.ok = false;
+      }
+      buckets.set(bucketStart, base);
     }
 
-    const upBuckets = buckets.filter((bucket) => bucket.ok).length;
-    const latencies = buckets
-      .map((bucket) => bucket.latencyMs)
-      .filter((latency): latency is number => latency !== null)
-      .sort((a, b) => a - b);
+    const ordered = Array.from(buckets.values()).sort((a, b) => a.timestamp - b.timestamp);
+    latencies.sort((a, b) => a - b);
+
+    const total = samples.length;
+    const uptimePercent = total === 0 ? 0 : Math.round((ok / total) * 10000) / 100;
+    const outageCount = this.countOutages(ordered);
 
     return {
-      uptimePercent: Number(((upBuckets / buckets.length) * 100).toFixed(2)),
-      p50LatencyMs: this.percentile(latencies, 0.5),
-      p95LatencyMs: this.percentile(latencies, 0.95),
-      outageCount: this.countOutages(buckets),
-      sampleCount: buckets.reduce((sum, bucket) => sum + bucket.sampleCount, 0),
+      network,
+      from: from.toISOString(),
+      to: to.toISOString(),
+      bucketSeconds,
+      summary: {
+        uptimePercent,
+        p50LatencyMs: this.percentile(latencies, 0.5),
+        p95LatencyMs: this.percentile(latencies, 0.95),
+        outageCount,
+        sampleCount: total,
+      },
+      samples: ordered,
     };
   }
 
-  private percentile(values: number[], percentile: number) {
-    if (values.length === 0) return null;
-    const index = Math.ceil(values.length * percentile) - 1;
-    return values[Math.max(0, Math.min(index, values.length - 1))];
-  }
-
-  private countOutages(buckets: NetworkHistoryBucket[]) {
+  private countOutages(brackets: NetworkHistoryBucket[]): number {
     let outages = 0;
-    let wasDown = false;
-
-    for (const bucket of buckets) {
-      if (!bucket.ok && !wasDown) outages += 1;
-      wasDown = !bucket.ok;
+    let inOutage = false;
+    for (const bucket of brackets) {
+      if (!bucket.ok && !inOutage) {
+        outages += 1;
+        inOutage = true;
+      } else if (bucket.ok) {
+        inOutage = false;
+      }
     }
-
     return outages;
   }
 
-  private errorMessage(error: unknown) {
-    return error instanceof Error ? error.message : String(error);
+  private percentile(values: number[], q: number): number | null {
+    if (values.length === 0) {
+      return null;
+    }
+    const index = Math.min(values.length - 1, Math.floor(q * values.length));
+    return values[index];
+  }
+
+  private async fetchCurrentStatus(network: 'mainnet' |'testnet'): Promise<NetworkStatus> {
+    const baseUrl = this.horizonUrl(network);
+    const startedAt = Date.now();
+    const response = await fetch(`${baseUrl}/ledgers?order=desc&limit=1`);
+    if (!response.ok) {
+      throw new Error(`Horizon response ${response.status}`);
+    }
+    const latency = Date.now() - startedAt;
+    const data = (await response.json()) as {
+      _embedded?: { records?: Array<Record<string, unknown>> };
+    };
+    const ledger = data._embedded?.records?.[0] ?? {};
+    const closeTime = typeof ledger.closed_at === 'string' ? ledger.closed_at : new Date().toISOString();
+    const sequence = typeof ledger.sequence === 'number' ? ledger.sequence : 0;
+    const closeTimeMs = new Date(closeTime).getTime();
+    const secondsSinceClose = Number.isFinite(closeTimeMs)
+      ? Math.max(0, Math.round((Date.now() - closeTimeMs) / 1000))
+      : 0;
+    const baseFee = typeof ledger.base_fee_in_strops === 'string' ? Number(ledger.base_fee_in_strops) : 100;
+    const fee = Number.isFinite(baseFee) ? baseFee : 100;
+    return {
+      timestamp: Date.now(),
+      network,
+      passphrase: this.passphrases[network],
+      ledger: {
+        sequence,
+        closeTime,
+        secondsSinceClose,
+        avgCloseTime: 5,
+      },
+      fees: {
+        baseFee: { min: fee, mode: fee, max: fee },
+        percentiles: { p10: fee, p50: fee, p90: fee, p99: fee },
+      },
+      latency,
+    };
   }
 }
