@@ -16,9 +16,10 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateNetworkProfileDto } from './dto/create-network-profile.dto';
 import { ImportNetworkProfileDto } from './dto/import-network-profile.dto';
+import { RecordConnectivityDto } from './dto/record-connectivity.dto';
 import { UpdateNetworkProfileDto } from './dto/update-network-profile.dto';
 import { VerifyNetworkPassphraseDto } from './dto/verify-network-passphrase.dto';
-import { NetworkService } from './network.service';
+import { NetworkService } from './networkService';
 
 @ApiTags('network')
 @Controller('network')
@@ -65,7 +66,7 @@ export class NetworkController {
   }
 
   @Get('profiles')
-  @UseGuards(JwtAuthGuard)
+  UseGuards(JwtAuthGuard)
   @ApiCookieAuth()
   @ApiOperation({ summary: 'List network profiles for the authenticated user' })
   @ApiResponse({ status: 200, description: 'List of profiles returned' })
@@ -75,7 +76,7 @@ export class NetworkController {
   }
 
   @Post('profiles')
-  @UseGuards(JwtAuthGuard)
+  UseGuards(JwtAuthGuard)
   @ApiCookieAuth()
   @ApiOperation({ summary: 'Create a new network profile' })
   @ApiResponse({ status: 201, description: 'Profile created' })
@@ -85,7 +86,7 @@ export class NetworkController {
   }
 
   @Put('profiles/:id')
-  @UseGuards(JwtAuthGuard)
+  UseGuards(JwtAuthGuard)
   @ApiCookieAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Update a network profile' })
@@ -100,7 +101,7 @@ export class NetworkController {
   }
 
   @Delete('profiles/:id')
-  @UseGuards(JwtAuthGuard)
+  UseGuards(JwtAuthGuard)
   @ApiCookieAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Delete a network profile' })
@@ -112,7 +113,7 @@ export class NetworkController {
   }
 
   @Post('profiles/verify')
-  @UseGuards(JwtAuthGuard)
+  UseGuards(JwtAuthGuard)
   @ApiCookieAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Verify a Horizon URL network passphrase' })
@@ -126,7 +127,7 @@ export class NetworkController {
   }
 
   @Put('profiles/:id/default')
-  @UseGuards(JwtAuthGuard)
+  UseGuards(JwtAuthGuard)
   @ApiCookieAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Mark a profile as the default for startup' })
@@ -137,7 +138,7 @@ export class NetworkController {
   }
 
   @Get('profiles/:id/export')
-  @UseGuards(JwtAuthGuard)
+  UseGuards(JwtAuthGuard)
   @ApiCookieAuth()
   @ApiOperation({ summary: 'Export a profile as JSON' })
   @ApiResponse({ status: 200, description: 'Profile exported as JSON' })
@@ -147,12 +148,59 @@ export class NetworkController {
   }
 
   @Post('profiles/import')
-  @UseGuards(JwtAuthGuard)
+  UseGuards(JwtAuthGuard)
   @ApiCookieAuth()
   @ApiOperation({ summary: 'Import a network profile from JSON' })
   @ApiResponse({ status: 201, description: 'Profile imported' })
   @ApiResponse({ status: 401, description: 'Authentication required' })
   importProfile(@CurrentUser() user: { id: string }, @Body() body: ImportNetworkProfileDto) {
     return this.networkService.importNetworkProfile(user.id, body);
+  }
+
+  @Get('profiles/:id/history')
+  UseGuards(JwtAuthGuard)
+  @ApiCookieAuth()
+  @ApiOperation({ summary: 'Get connectivity history and latency trends for a profile' })
+  @ApiQuery({
+    name: 'from',
+    required: false,
+    description: 'ISO date lower bound (default: 24 hours before to)',
+  })
+  @ApiQuery({ name: 'to', required: false, description: 'ISO date upper bound (default: now)' })
+  @ApiQuery({
+    name: 'bucket',
+    required: false,
+    enum: ['minute', 'hour', 'day'],
+    description: 'Aggregation bucket for latency trends (default: hour)',
+  })
+  @ApiResponse({ status: 200, description: 'Connectivity history and latency trends retrieved' })
+  @ApiResponse({ status: 400, description: 'Invalid ISO date range or bucket' })
+  @ApiResponse({ status: 401, description: 'Authentication required' })
+  @ApiResponse({ status: 404, description: 'Profile not found' })
+  getProfileHistory(
+    @Param('id') id: string,
+    @CurrentUser() user: { id: string },
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('bucket') bucket?: string,
+  ) {
+    return this.networkService.getProfileHistory(user.id, id, { from, to, bucket });
+  }
+
+  @Post('profiles/:id/history')
+  UseGuards(JwtAuthGuard)
+  @ApiCookieAuth()
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Record a connectivity check for a profile' })
+  @ApiResponse({ status: 201, description: 'Connectivity check recorded' })
+  @ApiResponse({ status: 400, description: 'Invalid connectivity check payload' })
+  @ApiResponse({ status: 401, description: 'Authentication required' })
+  @ApiResponse({ status: 404, description: 'Profile not found' })
+  recordProfileConnectivity(
+    @Param('id') id: string,
+    @CurrentUser() user: { id: string },
+    @Body() body: RecordConnectivityDto,
+  ) {
+    return this.networkService.recordProfileConnectivity(user.id, id, body);
   }
 }

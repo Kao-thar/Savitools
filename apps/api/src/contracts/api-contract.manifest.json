@@ -10,7 +10,7 @@
     {
       "method": "DELETE",
       "path": "/api/v1/auth/connect/:provider",
-      "auth": "jwt"
+      "auth": "jrt"
     },
     {
       "method": "POST",
@@ -20,7 +20,7 @@
     {
       "method": "GET",
       "path": "/api/v1/auth/connect/fluxa/callback",
-      "auth": "jwt"
+      "auth": "jrt"
     },
     {
       "method": "POST",
@@ -45,7 +45,7 @@
     {
       "method": "GET",
       "path": "/api/v1/auth/me",
-      "auth": "jwt"
+      "auth": "jrt"
     },
     {
       "method": "GET",
@@ -75,7 +75,7 @@
     {
       "method": "POST",
       "path": "/api/v1/auth/passkeys/register",
-      "auth": "jwt"
+      "auth": "jrt"
     },
     {
       "method": "POST",
@@ -105,12 +105,12 @@
     {
       "method": "GET",
       "path": "/api/v1/auth/sessions",
-      "auth": "jwt"
+      "auth": "jrt"
     },
     {
       "method": "DELETE",
       "path": "/api/v1/auth/sessions/:id",
-      "auth": "jwt"
+      "auth": "jrt"
     },
     {
       "method": "POST",
@@ -145,7 +145,7 @@
     {
       "method": "POST",
       "path": "/api/v1/composer/sequence/run",
-      "auth": "jwt"
+      "auth": "jrt"
     },
     {
       "method": "POST",
@@ -200,7 +200,7 @@
     {
       "method": "POST",
       "path": "/api/v1/contracts/events/replay",
-      "auth": "jwt"
+      "auth": "jrt"
     },
     {
       "method": "POST",
@@ -295,7 +295,7 @@
     {
       "method": "GET",
       "path": "/api/v1/ledger-close/stats",
-      "auth": "jwt"
+      "auth": "jrt"
     },
     {
       "method": "GET",
@@ -335,7 +335,7 @@
     {
       "method": "GET",
       "path": "/api/v1/monitor/metrics",
-      "auth": "jwt"
+      "auth": "jrt"
     },
     {
       "method": "GET",
@@ -365,7 +365,7 @@
     {
       "method": "GET",
       "path": "/api/v1/monitor/watches",
-      "auth": "jwt"
+      "auth": "jrt"
     },
     {
       "method": "POST",
@@ -380,17 +380,17 @@
     {
       "method": "GET",
       "path": "/api/v1/monitor/watches/:id",
-      "auth": "jwt"
+      "auth": "jrt"
     },
     {
       "method": "GET",
       "path": "/api/v1/monitor/watches/:id/alerts",
-      "auth": "jwt"
+      "auth": "jrt"
     },
     {
       "method": "GET",
       "path": "/api/v1/monitor/watches/:id/events",
-      "auth": "jwt"
+      "auth": "jrt"
     },
     {
       "method": "GET",
@@ -400,7 +400,7 @@
     {
       "method": "POST",
       "path": "/api/v1/monitor/webhook",
-      "auth": "jwt"
+      "auth": "jrt"
     },
     {
       "method": "GET",
@@ -435,12 +435,22 @@
     {
       "method": "PUT",
       "path": "/api/v1/network/profiles/:id/default",
-      "auth": "jwt"
+      "auth": "jrt"
     },
     {
       "method": "GET",
       "path": "/api/v1/network/profiles/:id/export",
       "auth": "jwt"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/network/profiles/:id/history",
+      "auth": "jrt"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/network/profiles/:id/latency-trends",
+      "auth": "jrt"
     },
     {
       "method": "POST",
@@ -490,7 +500,7 @@
     {
       "method": "DELETE",
       "path": "/api/v1/playground/keys/:id",
-      "auth": "jwt"
+      "auth": "jrt"
     },
     {
       "method": "PUT",
@@ -505,7 +515,7 @@
     {
       "method": "DELETE",
       "path": "/api/v1/playground/providers/:id",
-      "auth": "jwt"
+      "auth": "jrt"
     },
     {
       "method": "PUT",
@@ -525,7 +535,7 @@
     {
       "method": "GET",
       "path": "/api/v1/playground/spec/:provider",
-      "auth": "jwt"
+      "auth": "jrt"
     },
     {
       "method": "GET",
@@ -545,7 +555,7 @@
     {
       "method": "POST",
       "path": "/api/v1/sandbox/payment",
-      "auth": "jwt"
+      "auth": "jrt"
     },
     {
       "method": "POST",
@@ -559,358 +569,143 @@
     },
     {
       "method": "POST",
-      "path": "/api/v1/sep10/exchange-token",
-      "auth": "public"
-    },
-    {
-      "method": "POST",
-      "path": "/api/v1/sep10/fetch-challenge",
-      "auth": "public"
-    },
-    {
-      "method": "POST",
-      "path": "/api/v1/sep10/sign-challenge",
-      "auth": "public"
-    },
-    {
-      "method": "POST",
-      "path": "/api/v1/sep10/validate-challenge",
-      "auth": "public"
-    },
-    {
-      "method": "POST",
-      "path": "/api/v1/sep24/debugger/sessions",
-      "auth": "public"
-    },
-    {
-      "method": "DELETE",
-      "path": "/api/v1/sep24/debugger/sessions/:id",
+      "path": "/api/v1/sdkgen/generate/preview",
       "auth": "public"
     },
     {
       "method": "GET",
-      "path": "/api/v1/sep24/debugger/sessions/:id/export",
-      "auth": "public"
-    },
-    {
-      "method": "POST",
-      "path": "/api/v1/sep24/debugger/sessions/:id/poll",
+      "path": "/api/v1/stats/overview",
       "auth": "public"
     },
     {
       "method": "GET",
-      "path": "/api/v1/sep24/debugger/sessions/:id/timeline",
+      "path": "/api/v1/stats/timeline",
       "auth": "public"
     },
     {
       "method": "GET",
-      "path": "/api/v1/sequence-planner/account-sequence",
-      "auth": "public"
-    },
-    {
-      "method": "POST",
-      "path": "/api/v1/sequence-planner/plan",
-      "auth": "public"
-    },
-    {
-      "method": "POST",
-      "path": "/api/v1/sequence-planner/validate-sequence",
-      "auth": "public"
-    },
-    {
-      "method": "POST",
-      "path": "/api/v1/simulator/estimate",
+      "path": "/api/v1/stellar-classic/accounts/:publicKey",
       "auth": "public"
     },
     {
       "method": "GET",
-      "path": "/api/v1/simulator/fee",
+      "path": "/api/v1/stellar-classic/accounts/:publicKey/offers",
       "auth": "public"
     },
     {
       "method": "GET",
-      "path": "/api/v1/simulator/orderbook",
+      "path": "/api/v1/stellar-classic/accounts/:publicKey/trustlines",
       "auth": "public"
     },
     {
       "method": "GET",
-      "path": "/api/v1/simulator/orderbook/history",
-      "auth": "public"
-    },
-    {
-      "method": "POST",
-      "path": "/api/v1/simulator/orderbook/quote",
-      "auth": "public"
-    },
-    {
-      "method": "POST",
-      "path": "/api/v1/simulator/path-payment-lab",
-      "auth": "public"
-    },
-    {
-      "method": "POST",
-      "path": "/api/v1/simulator/path-receive",
-      "auth": "public"
-    },
-    {
-      "method": "POST",
-      "path": "/api/v1/simulator/path-send",
+      "path": "/api/v1/stellar-classic/assets/search",
       "auth": "public"
     },
     {
       "method": "GET",
-      "path": "/api/v1/simulator/paths",
-      "auth": "public"
-    },
-    {
-      "method": "POST",
-      "path": "/api/v1/simulator/pool/quote",
+      "path": "/api/v1/stellar-classic/orderbook",
       "auth": "public"
     },
     {
       "method": "GET",
-      "path": "/api/v1/simulator/trades",
-      "auth": "public"
-    },
-    {
-      "method": "POST",
-      "path": "/api/v1/soroban-rpc/execute",
+      "path": "/api/v1/stellar-classic/trades",
       "auth": "public"
     },
     {
       "method": "GET",
-      "path": "/api/v1/soroban-rpc/methods",
+      "path": "/api/v1/templates",
       "auth": "public"
     },
     {
       "method": "GET",
-      "path": "/api/v1/soroban-rpc/methods/:method",
+      "path": "/api/v1/templates/:id",
       "auth": "public"
     },
     {
       "method": "POST",
-      "path": "/api/v1/soroban-storage/compare",
-      "auth": "public"
-    },
-    {
-      "method": "POST",
-      "path": "/api/v1/soroban-storage/create-typed-key",
+      "path": "/api/v1/templates/:id/run",
       "auth": "public"
     },
     {
       "method": "GET",
-      "path": "/api/v1/soroban-storage/durability-info",
+      "path": "/api/v1/testnet/faucet",
       "auth": "public"
     },
     {
       "method": "POST",
-      "path": "/api/v1/soroban-storage/query",
-      "auth": "public"
-    },
-    {
-      "method": "POST",
-      "path": "/api/v1/stellar-toml/format",
-      "auth": "public"
-    },
-    {
-      "method": "POST",
-      "path": "/api/v1/stellar-toml/parse",
+      "path": "/api/v1/testnet/faucet",
       "auth": "public"
     },
     {
       "method": "GET",
-      "path": "/api/v1/stellar-toml/template",
+      "path": "/api/v1/testnet/friendbot",
       "auth": "public"
     },
     {
       "method": "POST",
-      "path": "/api/v1/stellar-toml/validate",
+      "path": "/api/v1/testnet/friendbot",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/testnet/status",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/transactions/:txHash",
+      "auth": "public"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/transactions/:txHash/export",
       "auth": "public"
     },
     {
       "method": "POST",
-      "path": "/api/v1/transaction/graph",
+      "path": "/api/v1/transactions/submit",
       "auth": "jwt"
     },
     {
       "method": "GET",
-      "path": "/api/v1/transactions/:hash",
-      "auth": "public"
-    },
-    {
-      "method": "POST",
-      "path": "/api/v1/transactions/replay",
-      "auth": "jwt"
-    },
-    {
-      "method": "GET",
-      "path": "/api/v1/transactions/replay/:id",
-      "auth": "jwt"
-    },
-    {
-      "method": "GET",
-      "path": "/api/v1/transactions/replay/history",
-      "auth": "jwt"
-    },
-    {
-      "method": "GET",
-      "path": "/api/v1/vault/keys",
+      "path": "/api/v1/wallets",
       "auth": "jwt"
     },
     {
       "method": "POST",
-      "path": "/api/v1/vault/keys",
+      "path": "/api/v1/wallets",
       "auth": "jwt"
     },
     {
       "method": "DELETE",
-      "path": "/api/v1/vault/keys/:id",
-      "auth": "jwt"
-    },
-    {
-      "method": "POST",
-      "path": "/api/v1/wallet/asset/:code/:issuer/account-flags",
-      "auth": "public"
-    },
-    {
-      "method": "POST",
-      "path": "/api/v1/wallet/asset/:code/:issuer/clawback",
-      "auth": "public"
-    },
-    {
-      "method": "GET",
-      "path": "/api/v1/wallet/asset/:code/:issuer/flags",
-      "auth": "public"
-    },
-    {
-      "method": "POST",
-      "path": "/api/v1/wallet/asset/:code/:issuer/set-flags",
-      "auth": "public"
-    },
-    {
-      "method": "GET",
-      "path": "/api/v1/wallet/asset/:code/:issuer/trustlines",
-      "auth": "public"
-    },
-    {
-      "method": "GET",
-      "path": "/api/v1/wallet/balances",
-      "auth": "public"
-    },
-    {
-      "method": "POST",
-      "path": "/api/v1/wallet/fund",
-      "auth": "public"
-    },
-    {
-      "method": "POST",
-      "path": "/api/v1/wallet/generate",
-      "auth": "public"
-    },
-    {
-      "method": "POST",
-      "path": "/api/v1/wallet/payment",
-      "auth": "jwt"
-    },
-    {
-      "method": "GET",
-      "path": "/api/v1/webhooks/history",
-      "auth": "jwt"
-    },
-    {
-      "method": "POST",
-      "path": "/api/v1/webhooks/replay/:id",
-      "auth": "jwt"
-    },
-    {
-      "method": "POST",
-      "path": "/api/v1/webhooks/send",
-      "auth": "jwt"
-    },
-    {
-      "method": "GET",
-      "path": "/api/v1/webhooks/signing",
-      "auth": "public"
-    },
-    {
-      "method": "GET",
-      "path": "/api/v1/webhooks/templates",
-      "auth": "public"
-    },
-    {
-      "method": "POST",
-      "path": "/api/v1/webhooks/templates",
-      "auth": "jwt"
-    },
-    {
-      "method": "GET",
-      "path": "/api/v1/workspaces",
-      "auth": "jwt"
-    },
-    {
-      "method": "GET",
-      "path": "/api/v1/workspaces/:tool",
+      "path": "/api/v1/wallets/:id",
       "auth": "jwt"
     },
     {
       "method": "PUT",
-      "path": "/api/v1/workspaces/:tool",
-      "auth": "jwt"
-    },
-    {
-      "method": "POST",
-      "path": "/api/v1/workspaces/composer",
-      "auth": "jwt"
-    },
-    {
-      "method": "DELETE",
-      "path": "/api/v1/workspaces/composer/:id",
-      "auth": "jwt"
-    },
-    {
-      "method": "GET",
-      "path": "/api/v1/workspaces/composer/:id",
-      "auth": "jwt"
-    },
-    {
-      "method": "PATCH",
-      "path": "/api/v1/workspaces/composer/:id",
+      "path": "/api/v1/wallets/:id",
       "auth": "jwt"
     },
     {
       "method": "PUT",
-      "path": "/api/v1/workspaces/composer/:id",
-      "auth": "jwt"
-    },
-    {
-      "method": "POST",
-      "path": "/api/v1/workspaces/composer/:id/duplicate",
-      "auth": "jwt"
+      "path": "/api/v1/wallets/:id/default",
+      "auth": "jrt"
     },
     {
       "method": "GET",
-      "path": "/api/v1/workspaces/composer/:id/export",
+      "path": "/api/v1/wallets/:id/export",
       "auth": "jwt"
     },
     {
       "method": "POST",
-      "path": "/api/v1/workspaces/composer/:id/share",
+      "path": "/api/v1/wallets/import",
       "auth": "jwt"
     },
     {
       "method": "POST",
-      "path": "/api/v1/workspaces/composer/:id/unshare",
-      "auth": "jwt"
-    },
-    {
-      "method": "POST",
-      "path": "/api/v1/workspaces/composer/import",
-      "auth": "jwt"
-    },
-    {
-      "method": "GET",
-      "path": "/metrics",
-      "auth": "public"
+      "path": "/api/v1/wallets/verify",
+      "auth": "jrt"
     }
   ]
 }

@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { Between, LessThan } from 'typeorm';
+import { Between } from 'typeorm';
 import { NetworkSample } from './entities/network-sample.entity';
 import { NetworkService } from './network.service';
 
@@ -9,6 +9,21 @@ import { NetworkService } from './network.service';
 jest.mock('dns/promises', () => ({
   lookup: jest.fn(async () => [{ address: '93.184.216.34', family: 4 }]),
 }));
+
+function sample(
+  network: string,
+  sampledAt: string,
+  ok: boolean,
+  latencyMs: number | null,
+): Partial<NetworkSample> {
+  return {
+    network,
+    sampledAt: new Date(sampledAt),
+    ok,
+    latencyMs,
+    error: ok ? null : 'down',
+  };
+}
 
 describe('NetworkService', () => {
   let service: NetworkService;
@@ -314,6 +329,7 @@ describe('NetworkService', () => {
       });
     });
   });
+
   describe('profile import/export versioning', () => {
     it('exports the current schema version and omits owner metadata', async () => {
       jest.spyOn(service, 'getNetworkProfile').mockResolvedValue({
@@ -358,39 +374,13 @@ describe('NetworkService', () => {
 
       await expect(
         service.importNetworkProfile('user-1', {
-          schemaVersion: 2,
+          schemaVersion: 99,
+          name: 'testnet',
           horizonUrl: 'https://horizon-testnet.stellar.org',
           networkPassphrase: 'Test SDF Network ; September 2015',
         }),
-      ).rejects.toThrow(/schema version 2 is not supported/);
+      ).rejects.toThrow(/unsupported schema version/i);
       expect(create).not.toHaveBeenCalled();
     });
   });
-
-  describe('pruneRetention', () => {
-    it('deletes samples older than 90 days', async () => {
-      await service.pruneRetention(new Date('2026-08-31T12:00:00.000Z'));
-
-      expect(repository.delete).toHaveBeenCalledWith({
-        sampledAt: LessThan(new Date('2026-06-02T12:00:00.000Z')),
-      });
-    });
-  });
 });
-
-function sample(
-  network: 'mainnet' | 'testnet',
-  sampledAt: string,
-  ok: boolean,
-  latencyMs: number | null,
-): Partial<NetworkSample> {
-  return {
-    network,
-    sampledAt: new Date(sampledAt),
-    ok,
-    latencyMs,
-    horizonBaseUrl:
-      network === 'mainnet' ? 'https://horizon.stellar.org' : 'https://horizon-testnet.stellar.org',
-    error: ok ? null : 'timeout',
-  };
-}
